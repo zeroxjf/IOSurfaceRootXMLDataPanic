@@ -1,9 +1,9 @@
 # IOSurface XML Data Panic
 
-**Device**: iPhone 17 Pro (iPhone18,1)  
-**OS**: iOS 26.5 RC 2 (23F77) — XNU 25.5.0 `xnu-12377.122.4~1`  
-**Class**: Kernel data abort (translation fault, level 2)  
-**Apple response**: Not a security vulnerability  
+**Device**: iPhone 17 Pro (iPhone18,1)<br>
+**OS**: iOS 26.5 RC 2 / 23F77 (same build later shipped publicly as iOS 26.5) — XNU 25.5.0 `xnu-12377.122.4~1`<br>
+**Class**: Kernel data abort (translation fault, level 2)<br>
+**Apple response**: Not a security vulnerability
 
 ---
 
@@ -20,7 +20,7 @@ lr 0x76867e005214cf50 (saved state: 0xfffffe7adabea310)
   far: 0x000000003fffffff   esr: 0x0000000096000046
 ```
 
-`far: 0x000000003fffffff` — the kernel faulted trying to dereference `0x3fffffff` (~1 GB). ESR `0x96000046` is a data abort from lower EL, DFSC `0x06` = translation fault at level 2. The address is not a kernel virtual address; it is a large integer derived from the oversized data payload being used as a pointer.
+`far: 0x000000003fffffff` — the kernel faulted on access to `0x3fffffff` (~1 GB). ESR `0x96000046` is a data abort taken without a change in exception level; DFSC `0x06` = translation fault at level 2, with the write/not-read bit set. The address is not a kernel virtual address; the register state is consistent with a large integer derived from the oversized data payload being used as an address.
 
 The faulting kext is `com.apple.iokit.IOSurface 393.5.7`.
 
@@ -68,10 +68,10 @@ IOConnectCallMethod(connection,
 
 `poc/` is an iOS Xcode project. Build for a physical device running iOS 26.5, install, and tap **Trigger XML Data**. The device will panic within a few seconds while building and submitting the payload.
 
-`panic-full-2026-05-10-115811.0002.ips` is the captured panic log from the test device.
+`panic-full-2026-05-10-115811.0002.ips` is the captured panic log from the test device. The panicked task name in that log is `PanicTest`, which was the local app name used when the panic was captured.
 
 ---
 
 ## Notes
 
-The bug is a missing or insufficient bounds check in IOSurface's XML property list path for `IOSurfaceAddressRanges`. The kernel faults rather than corrupting memory, which is why Apple closed it as not a security vulnerability. The fault is nonetheless reachable from an unprivileged sandbox — any installed app can reliably crash the device.
+The observed failure is consistent with a missing or insufficient bounds check in IOSurface's XML property list path for `IOSurfaceAddressRanges`. The captured behavior is a kernel fault rather than demonstrated memory corruption, which is why Apple closed it as not a security vulnerability. The fault is nonetheless reachable from an unprivileged sandbox — any installed app can reliably crash the device.
